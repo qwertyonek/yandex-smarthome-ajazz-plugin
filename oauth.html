@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Yandex OAuth Token</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1f2937, #020617);
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(15,23,42,0.96);
+      border-radius: 16px;
+      padding: 24px 24px 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+      border: 1px solid rgba(148,163,184,0.3);
+      backdrop-filter: blur(10px);
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #d1d5db;
+    }
+    input {
+      width: 100%;
+      padding: 9px 11px;
+      border-radius: 9px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      outline: none;
+    }
+    input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px #38bdf8;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border-radius: 9px;
+      border: 0;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.12s ease, transform 0.08s ease;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #0b1120;
+    }
+    .btn-primary:hover { filter: brightness(1.07); transform: translateY(-1px); }
+    .btn-secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+    }
+    .btn-secondary:hover { background: #020617; }
+    .token-box {
+      margin-top: 10px;
+      padding: 9px 11px;
+      border-radius: 9px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      word-break: break-all;
+      max-height: 140px;
+      overflow: auto;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 10px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+    }
+    .section {
+      margin-top: 16px;
+      border-top: 1px solid rgba(55,65,81,0.9);
+      padding-top: 14px;
+      margin-top: 18px;
+    }
+    .hint {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="title">Yandex OAuth токен</div>
+  <div class="subtitle">
+    Локальная утилита для получения отладочного access‑token Яндекса.
+    Данные никуда не отправляются кроме официальной страницы OAuth.
+  </div>
+
+  <!-- Форма ввода client_id -->
+  <div id="stepClient">
+    <label for="clientId">Client ID приложения Яндекс OAuth</label>
+    <input id="clientId" placeholder="например, 3500b96b45a349f0a266ce419af3f499">
+    <div class="row">
+      <button class="btn btn-primary" id="btnStart">Начать авторизацию</button>
+    </div>
+    <div class="hint">
+      Убедись, что в настройках приложения Redirect URI совпадает с адресом,
+      по которому открыт этот файл.
+    </div>
+  </div>
+
+  <!-- Блок с токеном -->
+  <div id="stepToken" style="display:none">
+    <label>Ваш access_token</label>
+    <div class="token-box" id="tokenBox"></div>
+    <div class="row">
+      <button class="btn btn-secondary" id="btnCopy">Скопировать токен</button>
+      <button class="btn btn-primary" id="btnNew">Получить новый</button>
+    </div>
+    <div class="status" id="status">Токен извлечён из URL фрагмента после авторизации.</div>
+    <div class="badge">
+      <span class="dot"></span>
+      <span>Храни токен в секрете. Не передавай его третьим лицам.</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function showStepClient() {
+    document.getElementById('stepClient').style.display = 'block';
+    document.getElementById('stepToken').style.display = 'none';
+  }
+  function showStepToken() {
+    document.getElementById('stepClient').style.display = 'none';
+    document.getElementById('stepToken').style.display = 'block';
+  }
+
+  // Попытка достать токен из URL фрагмента после редиректа
+  window.addEventListener('load', () => {
+    const hash = window.location.hash || '';
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const token = params.get('access_token');
+      if (token) {
+        document.getElementById('tokenBox').textContent = token;
+        showStepToken();
+        // очищаем hash чтобы токен не торчал в адресной строке
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      } else {
+        showStepClient();
+      }
+    } else {
+      showStepClient();
+    }
+
+    // если client_id передан как ?client_id=..., подставим его в поле
+    const search = new URLSearchParams(window.location.search);
+    const cid = search.get('client_id');
+    if (cid) document.getElementById('clientId').value = cid;
+  });
+
+  // Кнопка "Начать авторизацию"
+  document.getElementById('btnStart').onclick = () => {
+    const clientId = document.getElementById('clientId').value.trim();
+    if (!clientId) {
+      alert('Введи Client ID приложения.');
+      return;
+    }
+    const url =
+      'https://oauth.yandex.ru/authorize' +
+      '?response_type=token' +
+      '&client_id=' + encodeURIComponent(clientId);
+    window.location.href = url;
+  };
+
+  // Кнопка "Скопировать токен"
+  document.getElementById('btnCopy').onclick = async () => {
+    const token = document.getElementById('tokenBox').textContent.trim();
+    const status = document.getElementById('status');
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      status.textContent = 'Токен скопирован в буфер обмена.';
+    } catch (e) {
+      status.textContent = 'Не удалось скопировать, скопируй вручную.';
+    }
+  };
+
+  // Кнопка "Получить новый"
+  document.getElementById('btnNew').onclick = () => {
+    showStepClient();
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "Actions": [
+    {
+      "Icon": "imgs/icon.png",
+      "Name": "Smart Home Control",
+      "States": [
+        {
+          "Image": "imgs/key.png",
+          "TitleAlignment": "middle",
+          "FontSize": "10"
+        },
+        {
+          "Image": "imgs/key_on.png",
+          "TitleAlignment": "middle",
+          "FontSize": "10"
+        }
+      ],
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": true,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Управление устройством или сценарием Яндекс",
+      "UUID": "tg.qwertyonek.yandexsmarthome.control",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    }
+  ],
+  "SDKVersion": 1,
+  "Author": "qwertyonek",
+  "Name": "Yandex Smart Home Control",
+  "Icon": "imgs/icon.png",
+  "CodePathWin": "plugin/index.js",
+  "CodePathMac": "plugin/index.js",
+  "Description": "Управление Умным домом Яндекс с вашего Stream Deck",
+  "Category": "Smart Home",
+  "CategoryIcon": "imgs/icon.png",
+  "Version": "1.0.0",
+  "URL": "https://t.me/qwertyonek",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "3.0"
+  },
+  "Nodejs": {
+    "Version": "20"
+  }
+}
