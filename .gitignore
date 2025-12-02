@@ -16,7 +16,6 @@ Thumbs.db
 
 # Build artifacts
 *.zip
-*.streamDockPlugin
 
 # Temporary files
 *.tmp
