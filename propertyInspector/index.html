@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Yandex Smart Home Settings</title>
+    <style>
+        body {
+            background-color: #2d2d2d;
+            color: #b5b5b5;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .sdpi-item {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .sdpi-item-label {
+            width: 80px;
+            margin-right: 10px;
+            text-align: right;
+        }
+
+        .sdpi-item-value {
+            flex: 1;
+        }
+
+        input,
+        select {
+            width: 100%;
+            background-color: #3d3d3d;
+            border: 1px solid #5d5d5d;
+            color: #fff;
+            padding: 4px;
+            border-radius: 3px;
+        }
+
+        button {
+            background-color: #5d5d5d;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #6d6d6d;
+        }
+
+        .info {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        #status {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+
+        .success {
+            color: #4caf50;
+        }
+
+        .error {
+            color: #f44336;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Token</div>
+        <div class="sdpi-item-value">
+            <input type="password" id="token" placeholder="OAuth Token" onchange="saveToken()">
+            <button onclick="checkConnection()" style="margin-top: 5px;">Check Connection & Load List</button>
+            <div id="status"></div>
+            <div class="info">Token is shared across all buttons</div>
+        </div>
+    </div>
+
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Type</div>
+        <div class="sdpi-item-value">
+            <select id="type" onchange="updateListVisibility(); saveSettings();">
+                <option value="scenario">Scenario</option>
+                <option value="device">Device</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Item</div>
+        <div class="sdpi-item-value">
+            <select id="objectId" onchange="saveSettings()">
+                <option value="" disabled selected>Select an item...</option>
+            </select>
+            <div class="info">Select a scenario or device to control.</div>
+        </div>
+    </div>
+
+    <script>
+        let websocket = null;
+        let uuid = null;
+        let actionInfo = null;
+        let currentSettings = {};
+        let globalSettings = {};
+
+        let scenarios = [];
+        let devices = [];
+
+        function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo, inActionInfo) {
+            uuid = inUUID;
+            actionInfo = JSON.parse(inActionInfo);
+
+            websocket = new WebSocket('ws://127.0.0.1:' + inPort);
+
+            websocket.onopen = function () {
+                websocket.send(JSON.stringify({
+                    event: inRegisterEvent,
+                    uuid: inUUID
+                }));
+
+                // Request global settings first (for token)
+                websocket.send(JSON.stringify({
+                    event: 'getGlobalSettings',
+                    context: uuid
+                }));
+
+                // Request local settings (for type and objectId)
+                websocket.send(JSON.stringify({
+                    event: 'getSettings',
+                    context: uuid
+                }));
+            };
+
+            websocket.onmessage = function (evt) {
+                const jsonObj = JSON.parse(evt.data);
+
+                if (jsonObj.event === 'didReceiveGlobalSettings') {
+                    globalSettings = jsonObj.payload.settings || {};
+                    if (globalSettings.token) {
+                        document.getElementById('token').value = globalSettings.token;
+                    }
+                }
+                else if (jsonObj.event === 'didReceiveSettings') {
+                    currentSettings = jsonObj.payload.settings || {};
+                    if (currentSettings.type) document.getElementById('type').value = currentSettings.type;
+                    if (currentSettings.objectId) {
+                        // Try to populate list if we already have data
+                        populateList();
+                    }
+                }
+                else if (jsonObj.event === 'sendToPropertyInspector') {
+                    const payload = jsonObj.payload;
+                    if (payload.type === 'dataList') {
+                        scenarios = payload.scenarios;
+                        devices = payload.devices;
+
+                        document.getElementById('status').innerText = "Connected! List loaded.";
+                        document.getElementById('status').className = "success";
+
+                        populateList();
+                    } else if (payload.type === 'error') {
+                        document.getElementById('status').innerText = "Error: " + payload.message;
+                        document.getElementById('status').className = "error";
+                    }
+                }
+            };
+        }
+
+        function saveToken() {
+            const token = document.getElementById('token').value;
+            globalSettings.token = token;
+
+            if (websocket) {
+                websocket.send(JSON.stringify({
+                    event: 'setGlobalSettings',
+                    context: uuid,
+                    payload: globalSettings
+                }));
+            }
+        }
+
+        function checkConnection() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                document.getElementById('status').innerText = "Enter token first";
+                document.getElementById('status').className = "error";
+                return;
+            }
+
+            saveToken(); // Save token globally
+
+            document.getElementById('status').innerText = "Connecting...";
+            document.getElementById('status').className = "";
+
+            if (websocket) {
+                websocket.send(JSON.stringify({
+                    action: actionInfo.action,
+                    event: 'sendToPlugin',
+                    context: uuid,
+                    payload: {
+                        type: 'fetchData',
+                        token: token
+                    }
+                }));
+            }
+        }
+
+        function populateList() {
+            const type = document.getElementById('type').value;
+            const select = document.getElementById('objectId');
+            const savedId = currentSettings.objectId;
+
+            select.innerHTML = '<option value="" disabled selected>Select an item...</option>';
+
+            const list = type === 'scenario' ? scenarios : devices;
+
+            list.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.text = item.name;
+                if (item.id === savedId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+
+        function updateListVisibility() {
+            populateList();
+        }
+
+        function saveSettings() {
+            if (websocket) {
+                const type = document.getElementById('type').value;
+                const objectId = document.getElementById('objectId').value;
+
+                // Save local settings (without token)
+                const settings = {
+                    type: type,
+                    objectId: objectId
+                };
+
+                currentSettings = settings;
+
+                websocket.send(JSON.stringify({
+                    event: 'setSettings',
+                    context: uuid,
+                    payload: settings
+                }));
+
+                websocket.send(JSON.stringify({
+                    action: actionInfo.action,
+                    event: 'sendToPlugin',
+                    context: uuid,
+                    payload: {
+                        type: 'updateSettings',
+                        settings: settings
+                    }
+                }));
+            }
+        }
+    </script>
+</body>
+
+</html>

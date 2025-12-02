@@ -1,0 +1,23 @@
+# Node modules
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+log/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+*.zip
+*.streamDockPlugin
+
+# Temporary files
+*.tmp
+*.temp
