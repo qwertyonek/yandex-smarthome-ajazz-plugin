@@ -87,6 +87,7 @@ MIT License - см. [LICENSE](LICENSE)
 
 ## 🙏 Благодарности
 
+- **[onegamerstory](https://github.com/onegamerstory)** — за идею и вдохновение создать этот плагин
 - Yandex IoT API
 - Ajazz/StreamDock Community
 
